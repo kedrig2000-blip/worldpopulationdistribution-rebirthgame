@@ -1,0 +1,1330 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>세계 인구 분포 환생 시뮬레이터</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <!-- Tone.js for Sound Effects -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+    <!-- Chart.js for Statistics -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <style>
+        body { font-family: 'Inter', 'Pretendard', sans-serif; }
+        /* 3D Card Flip Effects */
+        .perspective-1000 { perspective: 1000px; }
+        .transform-style-3d { transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; }
+        .rotate-y-180 { transform: rotateY(180deg); }
+        .transition-transform { transition: transform 0.6s cubic-bezier(0.4, 0.2, 0.2, 1); }
+        
+        /* Custom Scrollbar for Pokedex */
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        
+        /* Animations */
+        @keyframes pulse-border {
+            0% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.4); }
+            70% { box-shadow: 0 0 0 6px rgba(99, 102, 241, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(99, 102, 241, 0); }
+        }
+        .animate-pulse-border { animation: pulse-border 2s infinite; }
+
+        @keyframes bounce-slow {
+            0%, 100% { transform: translateY(-5%); }
+            50% { transform: translateY(0); }
+        }
+        .animate-bounce-slow { animation: bounce-slow 2s infinite; }
+
+        /* Social Geography Background */
+        body {
+            background-image: linear-gradient(rgba(248, 250, 252, 0.80), rgba(248, 250, 252, 0.95)), url('https://images.unsplash.com/photo-1524661135-423995f22d0b?ixlib=rb-4.0.3&auto=format&fit=crop&w=2000&q=80');
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+        }
+    </style>
+</head>
+<body class="text-slate-900 h-screen flex flex-col overflow-hidden">
+
+    <!-- Header & Stats Dashboard -->
+    <header class="bg-white/80 backdrop-blur-md shadow-sm z-10 px-4 py-2 shrink-0 border-b border-slate-200/50">
+        <div class="max-w-6xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-black text-indigo-700 tracking-tight">
+                <i class="fa-solid fa-earth-americas mr-2"></i>세계 인구 환생 시뮬레이터
+            </h1>
+            <div class="bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100 flex items-center shadow-sm">
+                <span class="text-indigo-600 font-bold mr-2 text-sm">총 환생 횟수</span>
+                <span id="total-spins" class="text-lg font-black text-indigo-800 font-mono">0</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Navigation Tabs -->
+    <nav class="bg-white/80 backdrop-blur-md border-b border-slate-200/50 shrink-0">
+        <div class="max-w-6xl mx-auto flex">
+            <button onclick="switchTab('reincarnation')" id="tab-reincarnation" class="flex-1 py-3 text-center font-bold text-indigo-600 border-b-2 border-indigo-600 transition-colors relative">
+                <i class="fa-solid fa-dharmachakra mr-1"></i> 환생하기
+            </button>
+            <button onclick="switchTab('pokedex')" id="tab-pokedex" class="flex-1 py-3 text-center font-bold text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-colors relative">
+                <i class="fa-solid fa-book-atlas mr-1"></i> 국가 도감 (<span id="collection-count">0</span>/50)
+            </button>
+            <button onclick="switchTab('stats')" id="tab-stats" class="flex-1 py-3 text-center font-bold text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition-colors">
+                <i class="fa-solid fa-chart-pie mr-1"></i> 인구 통계 분석
+            </button>
+        </div>
+    </nav>
+
+    <!-- Content Area -->
+    <main class="flex-1 overflow-hidden relative bg-transparent">
+        
+        <!-- Tab 1: Reincarnation -->
+        <div id="view-reincarnation" class="h-full flex flex-col overflow-y-auto custom-scrollbar p-4 gap-4">
+            
+            <!-- Side-by-Side Layout Wrapper (PC/Tablet) -->
+            <div class="flex flex-col md:flex-row w-full max-w-6xl mx-auto gap-6 md:gap-8 items-center md:items-start justify-center pb-10 mt-2">
+                
+                <!-- Play Area (Card + Spin) -->
+                <div id="play-area" class="flex flex-col items-center justify-center w-full md:w-[380px] shrink-0 relative">
+                    <!-- 3D Card Container -->
+                    <div class="perspective-1000 w-full aspect-[2/3] max-w-[360px] relative cursor-pointer group shrink-0" onclick="openActiveCardQuiz()">
+                        <div id="card-inner" class="w-full h-full relative transform-style-3d transition-transform duration-700">
+                            
+                            <!-- Card Front (Hidden/Question Mark) -->
+                            <div class="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl shadow-xl flex flex-col items-center justify-center border-4 border-indigo-300">
+                                <i class="fa-solid fa-question text-8xl text-white opacity-50 animate-bounce-slow"></i>
+                                <p class="text-indigo-100 font-bold mt-8 tracking-widest text-lg">다음 생의 나는 어디로?</p>
+                            </div>
+                            
+                            <!-- Card Back (Revealed Country) -->
+                            <div class="absolute inset-0 backface-hidden rotate-y-180 bg-white rounded-2xl shadow-2xl flex flex-col border-2 border-slate-200 overflow-hidden">
+                                <!-- Card Header -->
+                                <div id="card-header-bg" class="h-40 bg-gradient-to-r from-blue-500 to-indigo-600 relative flex flex-col items-center justify-center pt-2">
+                                    <span id="card-continent" class="absolute top-3 left-3 bg-white/20 text-white text-sm px-2.5 py-1 rounded backdrop-blur-sm font-bold"></span>
+                                    
+                                    <div class="absolute top-3 right-3 flex flex-col items-end gap-1">
+                                        <span id="card-stars" class="text-yellow-300 text-base drop-shadow-md"></span>
+                                        <span id="card-rarity" class="text-xs font-black text-indigo-900 bg-white/80 px-2.5 py-1 rounded shadow-sm"></span>
+                                    </div>
+                                    
+                                    <img id="card-flag" src="" alt="국기" class="w-16 h-10 rounded-md shadow-md mt-4 object-cover border border-white/20" />
+                                    <h2 id="card-name" class="text-4xl font-black text-white drop-shadow-lg tracking-tight z-10 text-center px-4 leading-tight mt-2"></h2>
+                                </div>
+                                
+                                <!-- Card Body -->
+                                <div class="flex-1 p-5 flex flex-col justify-between">
+                                    <div>
+                                        <!-- Specs -->
+                                        <div class="bg-slate-50 rounded-xl p-3 mb-4 border border-slate-100">
+                                            <div class="flex justify-between items-center py-2 border-b border-slate-200">
+                                                <span class="text-slate-500 text-sm font-bold"><i class="fa-solid fa-users mr-1"></i>인구수</span>
+                                                <span id="card-pop" class="font-black text-slate-800 text-base"></span>
+                                            </div>
+                                            <div class="flex justify-between items-center py-2 border-b border-slate-200">
+                                                <span class="text-slate-500 text-sm font-bold"><i class="fa-solid fa-street-view mr-1"></i>인구밀도</span>
+                                                <span id="card-density" class="font-black text-amber-700 text-base"></span>
+                                            </div>
+                                            <div class="flex justify-between items-center py-2">
+                                                <span class="text-slate-500 text-sm font-bold"><i class="fa-solid fa-chart-pie mr-1"></i>세계 비중</span>
+                                                <span id="card-share" class="font-black text-indigo-700 text-base"></span>
+                                            </div>
+                                        </div>
+                                        
+                                        <!-- Job -->
+                                        <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-4 mb-4 relative mt-3">
+                                            <div class="absolute -top-3 left-3 bg-indigo-500 text-white text-xs font-bold px-2.5 py-0.5 rounded-full">💼 이번 생의 직업</div>
+                                            <p id="card-job" class="text-base font-bold text-indigo-900 mt-1 text-center leading-tight"></p>
+                                        </div>
+
+                                        <!-- Desc -->
+                                        <p id="card-desc" class="text-sm sm:text-base text-slate-600 leading-relaxed text-justify line-clamp-3"></p>
+                                    </div>
+                                    
+                                    <!-- Action Button -->
+                                    <div class="mt-4">
+                                        <button id="card-quiz-btn" class="w-full py-3 rounded-xl font-bold text-base shadow-sm transition-colors bg-indigo-100 text-indigo-700 hover:bg-indigo-200 border border-indigo-200">
+                                            <i class="fa-solid fa-pen mr-2"></i> 국가 퀴즈 풀기
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Pity/Event Banner -->
+                                <div id="card-banner" class="hidden absolute bottom-0 left-0 right-0 bg-gradient-to-r from-amber-500 to-orange-500 text-white text-base font-bold text-center py-2.5 shadow-[0_-4px_10px_rgba(0,0,0,0.1)]">
+                                    ✨ 확정 등장! ✨
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Spin Controls -->
+                    <div class="mt-5 flex flex-col items-center w-full max-w-[360px] shrink-0">
+                        <button id="spin-btn" onclick="spinRoulette()" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all transform active:scale-95 flex items-center justify-center text-xl">
+                            <span id="spin-btn-text">✨ 룰렛 돌리기 (태어나기!)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Master Achievement Screen (Native display when 50/50 is complete) -->
+                <div id="master-area" class="hidden flex-col items-center justify-center w-full md:w-[380px] max-w-sm p-8 bg-white/80 backdrop-blur-md rounded-3xl border-4 border-amber-400 shadow-2xl text-center animate-fade-in relative overflow-hidden shrink-0">
+                    <div class="absolute -top-10 -right-10 text-amber-200 opacity-30"><i class="fa-solid fa-crown text-8xl"></i></div>
+                    <div class="text-7xl mb-6 animate-bounce relative z-10">🏆</div>
+                    <h2 class="text-3xl font-black text-indigo-700 mb-3 relative z-10">지구촌 탐험 마스터!</h2>
+                    <p class="text-slate-600 font-bold mb-8 text-base relative z-10">모든 국가 수집 및 퀴즈를 완벽하게 정복했습니다.</p>
+                    <button onclick="playCeremony()" id="inline-ceremony-btn" class="w-full max-w-[240px] bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white font-black py-4 px-6 rounded-xl shadow-lg transition-all relative z-10 text-lg">
+                        ✨ 세레모니 보기!
+                    </button>
+                </div>
+                
+                <!-- Reward Dashboard (Pity + Quiz + Continent Missions) -->
+                <div class="w-full md:flex-1 max-w-4xl bg-white/90 backdrop-blur-md rounded-2xl border border-slate-200 shadow-sm p-5 shrink-0 flex flex-col gap-5">
+                    
+                    <div class="flex flex-col xl:flex-row gap-4 w-full">
+                        <!-- Pity Reward -->
+                        <div class="flex-1 bg-amber-50 rounded-xl border border-amber-100 p-4 flex flex-col justify-center shadow-sm">
+                            <div class="flex justify-between items-center text-xs font-bold text-amber-800 mb-2.5">
+                                <span class="text-sm">⚡ 8연속 환생 보상 (천장)</span>
+                                <span id="pity-text" class="text-amber-600">남은 횟수: 8회</span>
+                            </div>
+                            <div class="w-full bg-amber-200 rounded-full h-2">
+                                <div id="pity-bar" class="bg-amber-500 h-2 rounded-full transition-all" style="width: 0%"></div>
+                            </div>
+                        </div>
+
+                        <!-- Quiz Reward -->
+                        <div id="quiz-reward-container" class="flex-1 bg-emerald-50 rounded-xl border border-emerald-100 p-4 flex items-center justify-between shadow-sm cursor-pointer transition-all" onclick="checkQuizRewardClick()">
+                            <div class="flex flex-col">
+                                <span id="quiz-reward-title" class="text-emerald-800 font-black text-sm mb-1">🎁 퀴즈 보상 (8개)</span>
+                                <span class="text-xs text-emerald-600 font-bold" id="quiz-reward-desc">터치하여 보상 획득!</span>
+                            </div>
+                            <div class="text-center font-black text-emerald-700 font-mono text-lg bg-white px-3 py-1 rounded-lg shadow-sm border border-emerald-100" id="quiz-reward-text">0 / 8</div>
+                        </div>
+                    </div>
+
+                    <!-- Continent Missions -->
+                    <div class="bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200 p-4 flex flex-col gap-3 shadow-sm">
+                        <div class="flex flex-wrap items-center gap-2 mb-2">
+                            <i class="fa-solid fa-map-location-dot text-amber-600 text-xl"></i>
+                            <h3 class="font-black text-amber-800 text-base">🌍 대륙 탐험 수집 미션</h3>
+                            <span class="text-xs text-amber-700 font-bold bg-amber-200/60 px-2 py-0.5 rounded-full ml-1">50% / 100% 달성 시 보상!</span>
+                        </div>
+                        <div id="continent-missions" class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                            <!-- Continent items injected via JS -->
+                        </div>
+                    </div>
+
+                </div>
+
+            </div> <!-- Layout Wrapper End -->
+        </div>
+
+        <!-- Tab 2: Pokedex -->
+        <div id="view-pokedex" class="hidden h-full flex flex-col p-4">
+            <div class="max-w-6xl mx-auto w-full h-full flex flex-col">
+                <!-- Continent Filter -->
+                <div class="flex gap-2 overflow-x-auto custom-scrollbar pb-2 mb-3 shrink-0" id="pokedex-filters">
+                    <button onclick="setFilter('all')" id="filter-all" class="px-4 py-1.5 rounded-full text-sm font-bold transition-colors bg-indigo-600 text-white whitespace-nowrap shadow-sm">전체</button>
+                    <button onclick="setFilter('아시아')" id="filter-아시아" class="px-4 py-1.5 rounded-full text-sm font-bold transition-colors bg-slate-200 text-slate-600 hover:bg-slate-300 whitespace-nowrap shadow-sm">아시아</button>
+                    <button onclick="setFilter('아프리카')" id="filter-아프리카" class="px-4 py-1.5 rounded-full text-sm font-bold transition-colors bg-slate-200 text-slate-600 hover:bg-slate-300 whitespace-nowrap shadow-sm">아프리카</button>
+                    <button onclick="setFilter('유럽')" id="filter-유럽" class="px-4 py-1.5 rounded-full text-sm font-bold transition-colors bg-slate-200 text-slate-600 hover:bg-slate-300 whitespace-nowrap shadow-sm">유럽</button>
+                    <button onclick="setFilter('북아메리카')" id="filter-북아메리카" class="px-4 py-1.5 rounded-full text-sm font-bold transition-colors bg-slate-200 text-slate-600 hover:bg-slate-300 whitespace-nowrap shadow-sm">북아메리카</button>
+                    <button onclick="setFilter('남아메리카')" id="filter-남아메리카" class="px-4 py-1.5 rounded-full text-sm font-bold transition-colors bg-slate-200 text-slate-600 hover:bg-slate-300 whitespace-nowrap shadow-sm">남아메리카</button>
+                    <button onclick="setFilter('오세아니아')" id="filter-오세아니아" class="px-4 py-1.5 rounded-full text-sm font-bold transition-colors bg-slate-200 text-slate-600 hover:bg-slate-300 whitespace-nowrap shadow-sm">오세아니아</button>
+                </div>
+                <!-- Grid -->
+                <div class="flex-1 overflow-y-auto custom-scrollbar bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+                    <div id="pokedex-grid" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                        <!-- Cards injected via JS -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab 3: Stats -->
+        <div id="view-stats" class="hidden h-full flex flex-col p-4 overflow-y-auto custom-scrollbar">
+            <div class="max-w-6xl mx-auto w-full">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6">
+                    <h2 class="text-xl font-black text-slate-800 mb-6 text-center">🌍 인구 비율 분석: 이론 vs 실제 내 기록</h2>
+                    
+                    <div class="grid md:grid-cols-2 gap-8">
+                        <!-- Theoretical Chart -->
+                        <div class="flex flex-col items-center bg-slate-50 p-4 rounded-xl border border-slate-100">
+                            <h3 class="font-bold text-slate-700 mb-4 text-center">📊 이론적인 세계 대륙별 인구 비율<br><span class="text-xs font-normal text-slate-500">(확률 모델 기준)</span></h3>
+                            <div class="w-full max-w-[300px] aspect-square">
+                                <canvas id="chart-theoretical"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Actual Chart -->
+                        <div class="flex flex-col items-center bg-indigo-50 p-4 rounded-xl border border-indigo-100">
+                            <h3 class="font-bold text-indigo-800 mb-4 text-center">🎲 실제 내가 환생한 대륙 비율<br><span class="text-xs font-normal text-indigo-500">(나의 누적 환생 결과)</span></h3>
+                            <div class="w-full max-w-[300px] aspect-square relative">
+                                <canvas id="chart-actual"></canvas>
+                                <div id="chart-empty-msg" class="absolute inset-0 flex items-center justify-center text-indigo-400 font-bold text-sm hidden">
+                                    아직 환생 기록이 없습니다.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <p class="text-center text-sm text-slate-500 mt-6 bg-white p-3 rounded-lg border border-slate-100">
+                        💡 <strong>통계적 사실:</strong> 시행 횟수(환생 횟수)가 많아질수록 '실제 내 기록' 그래프가 '이론적 비율' 그래프와 점점 비슷해지는 <strong>대수의 법칙</strong>을 확인해 보세요!
+                    </p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer Copyright -->
+    <footer class="shrink-0 bg-white/60 backdrop-blur-md border-t border-slate-200/50 py-1.5 text-center relative z-10">
+        <p class="text-[10px] text-slate-400 font-bold tracking-wider">
+            &copy; 2026. YOONKANGKONG All rights reserved. | 교육용 세계 인구 시뮬레이터
+        </p>
+    </footer>
+
+    <!-- QUIZ MODAL -->
+    <div id="quiz-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="bg-indigo-600 p-4 flex justify-between items-center shrink-0">
+                <h3 class="text-white font-black text-lg" id="quiz-modal-title">국가 퀴즈</h3>
+                <button onclick="closeModal('quiz-modal')" class="text-indigo-200 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            
+            <div class="p-5 overflow-y-auto custom-scrollbar">
+                <!-- Country Info Snippet -->
+                <div class="flex items-center gap-3 mb-5 bg-slate-50 p-3 rounded-xl border border-slate-100">
+                    <div class="w-12 h-12 rounded-full bg-indigo-100 flex items-center justify-center text-xl shrink-0">🌍</div>
+                    <div>
+                        <div class="text-xs font-bold text-indigo-600 mb-0.5" id="quiz-modal-continent"></div>
+                        <div class="font-black text-slate-800 text-lg leading-tight" id="quiz-modal-country-name"></div>
+                    </div>
+                </div>
+
+                <!-- Job Snippet -->
+                <div class="bg-amber-50 border border-amber-100 rounded-lg p-3 mb-5">
+                    <span class="text-[10px] font-bold text-amber-700 bg-amber-200 px-2 py-0.5 rounded-full mb-1 inline-block">직업</span>
+                    <p class="text-sm font-bold text-amber-900" id="quiz-modal-job"></p>
+                </div>
+
+                <div class="mb-5">
+                    <p class="font-bold text-slate-800 text-sm bg-indigo-50 p-3 rounded-xl border border-indigo-100" id="quiz-question"></p>
+                </div>
+                
+                <div class="space-y-2" id="quiz-options">
+                    <!-- Options injected here -->
+                </div>
+
+                <div id="quiz-result-area" class="mt-4 hidden">
+                    <div id="quiz-result-text" class="text-center font-bold p-3 rounded-xl"></div>
+                </div>
+            </div>
+            <div class="p-4 border-t border-slate-100 bg-slate-50 shrink-0">
+                <button onclick="closeModal('quiz-modal')" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 rounded-xl transition-colors">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- CONTINENT QUIZ MODAL -->
+    <div id="continent-quiz-modal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden">
+            <div class="bg-amber-500 p-4 flex justify-between items-center">
+                <h3 class="text-white font-black text-lg">🌍 대륙 탐험가 자격 시험</h3>
+                <button onclick="closeModal('continent-quiz-modal')" class="text-amber-200 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <div class="p-5">
+                <p class="text-sm font-bold text-amber-600 mb-4 text-center">보상을 받으려면 이 대륙에 대한 퀴즈를 통과해야 합니다!</p>
+                <div class="mb-5">
+                    <p class="font-bold text-slate-800 text-sm bg-slate-50 p-4 rounded-xl border border-slate-200" id="cont-quiz-q"></p>
+                </div>
+                <div class="space-y-2" id="cont-quiz-options">
+                    <!-- Options -->
+                </div>
+                <div id="cont-quiz-result" class="mt-4 text-center font-bold text-sm hidden p-3 rounded-xl"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- REWARD PULL POPUP -->
+    <div id="reward-popup" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex flex-col items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center relative overflow-hidden shadow-2xl border-4 border-amber-300">
+            <!-- decorative -->
+            <div class="absolute -top-10 -right-10 text-amber-200 opacity-20"><i class="fa-solid fa-star text-9xl"></i></div>
+            <div class="absolute -bottom-10 -left-10 text-amber-200 opacity-20"><i class="fa-solid fa-crown text-9xl"></i></div>
+            
+            <div class="relative z-10">
+                <div class="text-5xl mb-4 animate-bounce-slow">🎁</div>
+                <h2 id="reward-popup-title" class="text-2xl font-black text-slate-800 mb-2">보상 도착!</h2>
+                <p id="reward-popup-desc" class="text-slate-600 text-sm font-bold mb-6"></p>
+                
+                <button id="reward-pull-btn" class="w-full bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-500 hover:to-orange-600 text-white font-black py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1 text-lg">
+                    ✨ 희귀 보상 카드 뽑기!
+                </button>
+                <button onclick="closeModal('reward-popup')" class="mt-4 text-sm font-bold text-slate-400 hover:text-slate-600 underline">나중에 뽑기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 50 COUNTRIES COMPLETION POPUP -->
+    <div id="completion-popup" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 hidden flex flex-col items-center justify-center p-4">
+        <div class="bg-white rounded-3xl p-8 max-w-sm w-full text-center relative overflow-hidden shadow-2xl border-4 border-indigo-400">
+            <div class="text-6xl mb-4 animate-bounce">🏆</div>
+            <h2 class="text-2xl font-black text-slate-800 mb-2">지구촌 탐험 마스터!</h2>
+            <div id="completion-title" class="text-indigo-600 font-black text-xl mb-2 bg-indigo-50 py-1 px-3 rounded-lg inline-block border border-indigo-200"></div>
+            <p id="completion-desc" class="text-slate-600 text-sm font-bold mb-4 whitespace-pre-line"></p>
+            <div class="bg-indigo-50 p-4 rounded-xl mb-6">
+                <p class="text-indigo-800 text-[13px] font-bold leading-relaxed">
+                    상단의 <span class="text-indigo-600 font-black">인구 통계 분석</span> 탭으로 이동해서<br>
+                    이론적인 세계 인구 확률과<br>나의 <span class="text-rose-500">실제 환생 횟수 분포</span>가<br>
+                    얼마나 비슷한지 비교해보세요!
+                </p>
+            </div>
+            <button id="popup-ceremony-btn" onclick="playCeremony()" class="w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white font-black py-3 px-6 rounded-xl shadow-lg transition-all mb-3 hidden">✨ 세레모니 보기!</button>
+            <button onclick="closeModal('completion-popup')" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 px-6 rounded-xl transition-all">닫기</button>
+        </div>
+    </div>
+
+    <script>
+        // ----------------------------------------------------
+        // 1. DATA: 50 Countries (Ratio: Asia 20, Africa 9, Europe 9, NA 4, SA 6, Oceania 2)
+        // ----------------------------------------------------
+        const TOTAL_WORLD_POP = 8100000000;
+
+        const COUNTRIES = [
+            // === ASIA (20) ===
+            { id: "cn", name: "중국", pop: 1425670000, continent: "아시아", density: 153, stars: 1, job: "만리장성 및 판다 생태 구역 관리소장", desc: "세계 인구 2위의 대국. 거대한 영토와 오랜 역사를 자랑합니다.", quiz: { q: "사계절이 나타나는 중위도 지역에서, 여름과 겨울에 불어오는 방향이 반대로 바뀌어 농사(벼농사)에 큰 영향을 주는 이 바람은?", options: ["계절풍(몬순)", "편서풍", "무역풍", "극동풍"], a: 0 } },
+            { id: "in", name: "인도", pop: 1428620000, continent: "아시아", density: 481, stars: 1, job: "발리우드 영화 감독 겸 타지마할 가이드", desc: "세계 인구 1위에 등극한 국가. IT 산업과 영화 산업이 발달했습니다.", quiz: { q: "최근 인구가 급격히 늘어나면서 세계에서 인구가 가장 많은 나라가 되었습니다. 인구가 너무 많을 때 발생할 수 있는 문제가 아닌 것은?", options: ["노동력 부족", "식량 부족", "교통 혼잡", "주택 부족"], a: 0 } },
+            { id: "id", name: "인도네시아", pop: 277530000, continent: "아시아", density: 153, stars: 1, job: "1만 개 섬을 잇는 페리 선장 및 커피 감별사", desc: "세계에서 가장 섬이 많은 나라. 열대우림과 화산이 많습니다.", quiz: { q: "태평양을 둥글게 둘러싸고 있어 화산 폭발과 지진이 전 세계에서 가장 자주, 활발하게 일어나는 이 지역을 부르는 말은?", options: ["환태평양 조산대", "알프스-히말라야 조산대", "동아프리카 열곡대", "대서양 중앙 해령"], a: 0 } },
+            { id: "pk", name: "파키스탄", pop: 240480000, continent: "아시아", density: 312, stars: 1, job: "히말라야 K2 베이스캠프 관리 대원", desc: "인도와 국경을 접한 나라. K2 등 높은 산맥이 유명합니다.", quiz: { q: "아시아 대륙 남부에 위치하며, 세계에서 가장 높은 산들이 모여 있어 '세계의 지붕'이라 불리는 거대한 산맥은?", options: ["히말라야 산맥", "알프스 산맥", "안데스 산맥", "로키 산맥"], a: 0 } },
+            { id: "bd", name: "방글라데시", pop: 172950000, continent: "아시아", density: 1329, stars: 1, job: "갠지스강 삼각주 비옥한 평야 농장주", desc: "인구밀도가 매우 높은 나라. 갠지스강 삼각주에 위치합니다.", quiz: { q: "강물이 바다로 흘러드는 입구에 강물이 싣고 온 흙과 모래가 쌓여 만들어진 평평하고 비옥한 땅을 무엇이라 할까요?", options: ["삼각주", "선상지", "분지", "고원"], a: 0 } },
+            { id: "jp", name: "일본", pop: 123290000, continent: "아시아", density: 338, stars: 2, job: "신칸센 고속열차 기관사 및 온천 여관 주인", desc: "4개의 큰 섬으로 이루어진 섬나라. 화산과 지진이 잦습니다.", quiz: { q: "지진이 잦은 지역에서는 건물이 무너지는 것을 막기 위해 특별한 기술을 사용하여 집을 짓습니다. 이 설계 방식을 무엇이라 할까요?", options: ["내진 설계", "단열 설계", "방수 설계", "방음 설계"], a: 0 } },
+            { id: "ph", name: "필리핀", pop: 117330000, continent: "아시아", density: 394, stars: 2, job: "보라카이 해양 스쿠버다이빙 강사", desc: "동남아시아의 섬나라. 열대 기후로 바나나 등 열대 과일이 유명합니다.", quiz: { q: "열대 기후 지역에서 선진국의 자본과 기술력, 그리고 원주민의 노동력을 합쳐 바나나나 커피 등을 대규모로 재배하는 농업 방식은?", options: ["플랜테이션", "벼농사", "유목", "혼합 농업"], a: 0 } },
+            { id: "vn", name: "베트남", pop: 98850000, continent: "아시아", density: 314, stars: 2, job: "메콩강 수상시장 쌀국수(퍼) 마스터 셰프", desc: "동남아시아 인도차이나 반도 동부에 위치. 쌀 수출국입니다.", quiz: { q: "1년 내내 기온이 높고 비가 많이 내리는 기후 덕분에 동남아시아 사람들이 가장 많이 재배하고 주식으로 삼는 이 곡물은?", options: ["쌀", "밀", "옥수수", "감자"], a: 0 } },
+            { id: "ir", name: "이란", pop: 89170000, continent: "아시아", density: 55, stars: 2, job: "페르시아 융단(카펫) 수석 디자이너", desc: "중동에 위치한 국가. 과거 '페르시아'로 불렸으며 석유가 풍부합니다.", quiz: { q: "비가 거의 오지 않아 나무가 자라기 힘들며, 일교차가 매우 커서 낮에는 덥고 밤에는 추운 이 기후는?", options: ["건조 기후", "열대 기후", "온대 기후", "한대 기후"], a: 0 } },
+            { id: "tr", name: "튀르키예", pop: 85810000, continent: "아시아", density: 110, stars: 2, job: "카파도키아 열기구 조종사", desc: "아시아와 유럽을 잇는 나라. 형제의 나라로 불립니다.", quiz: { q: "지리적으로 서로 다른 두 대륙이 만나는 길목에 위치해 있어, 여러 나라의 문물이 오가고 다양한 문화가 섞이는 곳을 부르는 용어는?", options: ["교통의 요지", "내륙국", "고산 지대", "극지방"], a: 0 } },
+            { id: "th", name: "태국", pop: 71800000, continent: "아시아", density: 140, stars: 2, job: "방콕 왕궁 전속 코끼리 조련사", desc: "동남아시아의 불교 국가. 관광 산업이 발달했습니다.", quiz: { q: "동남아시아의 여러 나라에서 옛날부터 많이 믿어온 종교로, 둥근 지붕의 화려한 사원과 거대한 불상을 흔히 볼 수 있는 이 종교는?", options: ["불교", "힌두교", "이슬람교", "크리스트교"], a: 0 } },
+            { id: "mm", name: "미얀마", pop: 54570000, continent: "아시아", density: 83, stars: 3, job: "황금 불탑(파고다) 보존 및 금박 장인", desc: "동남아시아 국가. 수많은 불탑(파고다)으로 유명합니다.", quiz: { q: "전 세계 인구의 절반 이상이 모여 살며, 세계에서 가장 넓은 면적을 차지하고 있는 대륙은 어디일까요?", options: ["아시아", "아프리카", "유럽", "북아메리카"], a: 0 } },
+            { id: "kr", name: "대한민국", pop: 51780000, continent: "아시아", density: 515, stars: 3, job: "K-POP 글로벌 프로듀서 겸 e스포츠 감독", desc: "우리가 살고 있는 자랑스러운 나라! IT 강국이자 한류의 중심입니다.", quiz: { q: "사계절의 변화가 뚜렷하며, 여름에는 기온이 높고 비가 많이 오지만 겨울에는 춥고 눈이 내리기도 하는 중위도 지역의 기후는?", options: ["온대 기후", "열대 기후", "건조 기후", "한대 기후"], a: 0 } },
+            { id: "iq", name: "이라크", pop: 45500000, continent: "아시아", density: 104, stars: 4, job: "메소포타미아 문명 유적 발굴 고고학자", desc: "티그리스강과 유프라테스강이 흐르는 고대 메소포타미아 문명의 발상지입니다.", quiz: { q: "과거 농사가 잘 되는 강 주변에서 인류의 고대 문명(4대 문명)이 처음 시작되었습니다. 이 문명들이 공통적으로 발생한 지형은?", options: ["큰 강 유역", "높은 산지", "건조한 사막", "깊은 바다"], a: 0 } },
+            { id: "af", name: "아프가니스탄", pop: 42230000, continent: "아시아", density: 64, stars: 4, job: "힌두쿠시 산맥 고산 지대 유목민", desc: "아시아 중앙부에 위치한 내륙국. 험준한 산악 지대가 많습니다.", quiz: { q: "바다와 전혀 맞닿아 있지 않고 육지로만 둘러싸여 있어서, 배를 이용한 해상 무역이나 해산물을 구하기가 불리한 형태의 국가는?", options: ["내륙국", "섬나라", "반도 국가", "해양국"], a: 0 } },
+            { id: "sa", name: "사우디아라비아", pop: 36940000, continent: "아시아", density: 17, stars: 4, job: "사하라 사막 오아시스 수자원 관리자", desc: "아라비아 반도에 위치한 세계 최대의 석유 수출국입니다.", quiz: { q: "서남아시아 사막 지역의 땅속에 풍부하게 묻혀 있으며, 자동차나 공장을 움직이게 하는 현대 산업의 핵심 자원은?", options: ["석유", "석탄", "천연가스", "철광석"], a: 0 } },
+            { id: "uz", name: "우즈베키스탄", pop: 35160000, continent: "아시아", density: 78, stars: 4, job: "실크로드 무역로 낙타 상단 대행수", desc: "중앙아시아의 내륙국. 과거 동서양을 잇는 실크로드의 중심지였습니다.", quiz: { q: "과거 아시아와 유럽을 이어주던 교역로로, 주로 중국의 비단이 낙타를 통해 유럽으로 전해져서 이름이 붙여진 이 길은?", options: ["실크로드(비단길)", "스파이스로드(향신료길)", "오리엔트 익스프레스", "차마고도"], a: 0 } },
+            { id: "my", name: "말레이시아", pop: 34300000, continent: "아시아", density: 104, stars: 5, job: "쿠알라룸푸르 트윈타워 야경 투어 가이드", desc: "동남아시아 국가로 말레이 반도와 보르네오 섬 북부에 걸쳐 있습니다.", quiz: { q: "바다와 인접해 있는 나라(섬이나 반도)에서, 예로부터 다른 나라와 물건을 사고팔기 위해 가장 발달하기 쉬웠던 교통수단은?", options: ["해상 무역(배)", "항공 교통(비행기)", "철도 교통(기차)", "육로 무역(말)"], a: 0 } },
+            { id: "ye", name: "예멘", pop: 34440000, continent: "아시아", density: 65, stars: 5, job: "전통 진흙 건축물(시밤) 보존 전문가", desc: "아라비아 반도 남단에 위치. 고대부터 무역의 교차로였습니다.", quiz: { q: "국토의 대부분이 모래 사막으로 덮여 있어 비가 거의 오지 않기 때문에, 예로부터 사람들이 물을 구하기 위해 찾아다닌 곳은?", options: ["오아시스", "빙하", "온천", "밀림"], a: 0 } },
+            { id: "kz", name: "카자흐스탄", pop: 19890000, continent: "아시아", density: 7, stars: 5, job: "드넓은 스텝(초원) 지대 유목 기수", desc: "세계에서 9번째로 큰 영토를 가진 중앙아시아의 거대한 내륙국입니다.", quiz: { q: "비가 조금 내려 나무가 자라기는 힘들지만, 짧은 풀이 넓게 자라서 양이나 말 같은 가축을 기르며 이동 생활을 하는 지대는?", options: ["스텝(초원)", "툰드라", "타이가", "사바나"], a: 0 } },
+
+            // === AFRICA (9) ===
+            { id: "ng", name: "나이지리아", pop: 223800000, continent: "아프리카", density: 245, stars: 1, job: "아프리카 최대 영화산업(놀리우드) 기획자", desc: "아프리카 인구 1위 국가. 다양한 부족과 언어가 존재합니다.", quiz: { q: "아프리카 대륙은 적도를 중심으로 기후가 거의 대칭을 이룹니다. 적도 바로 주변에 나타나 1년 내내 덥고 습한 기후는?", options: ["열대 우림 기후", "지중해성 기후", "건조 기후", "온대 기후"], a: 0 } },
+            { id: "et", name: "에티오피아", pop: 126520000, continent: "아프리카", density: 115, stars: 2, job: "야생 커피나무 숲 최고급 원두 감별사", desc: "아프리카의 뿔에 위치. 커피의 본고장으로 유명합니다.", quiz: { q: "적도 주변에 위치하더라도, 해발 고도가 매우 높은 지역에서는 1년 내내 봄처럼 선선한 날씨가 나타납니다. 이 기후는?", options: ["고산 기후", "해양성 기후", "툰드라 기후", "대륙성 기후"], a: 0 } },
+            { id: "eg", name: "이집트", pop: 112710000, continent: "아프리카", density: 112, stars: 2, job: "피라미드 스핑크스 청소 및 유물 관리사", desc: "나일강의 축복을 받은 고대 문명국. 피라미드가 있습니다.", quiz: { q: "주변이 온통 모래 사막인 곳에서도 강 주변이나 오아시스에 사람들이 큰 도시를 짓고 모여 사는 가장 큰 이유는?", options: ["생활과 농사에 필요한 물을 구하기 쉬워서", "석유 자원이 풍부해서", "더위를 피하기 좋아서", "야생 동물이 적어서"], a: 0 } },
+            { id: "cd", name: "콩고민주공화국", pop: 102260000, continent: "아프리카", density: 45, stars: 2, job: "콩고 분지 열대우림 희귀 고릴라 보호대원", desc: "아프리카 중앙에 위치한 거대한 열대우림의 나라입니다.", quiz: { q: "지구의 산소를 만들어내어 '지구의 허파'라고도 불리는 열대 우림이 파괴될 때 일어날 수 있는 가장 심각한 환경 문제는?", options: ["지구 온난화 심화", "지진 발생 증가", "오존층 두꺼워짐", "바닷물 온도 하강"], a: 0 } },
+            { id: "tz", name: "탄자니아", pop: 67430000, continent: "아프리카", density: 71, stars: 3, job: "세렝게티 초원 사파리 투어 마스터", desc: "세렝게티 국립공원과 아프리카 최고봉 킬리만자로 산이 있습니다.", quiz: { q: "비가 많이 오는 '우기'와 비가 안 오는 '건기'가 뚜렷하며, 사자나 기린 같은 수많은 야생 동물이 모여 사는 열대 초원 지대는?", options: ["사바나", "오아시스", "팜파스", "툰드라"], a: 0 } },
+            { id: "za", name: "남아프리카 공화국", pop: 60410000, continent: "아프리카", density: 50, stars: 3, job: "희망봉 등대지기 및 금/다이아몬드 광부", desc: "아프리카 대륙 최남단에 위치. 희망봉이 유명합니다.", quiz: { q: "아프리카 대륙 맨 남쪽에 위치하여, 과거 유럽인들이 인도로 가는 새로운 바닷길을 찾을 때 중요하게 거쳐 갔던 바다의 곶(Cape)은?", options: ["희망봉", "혼 곶", "마젤란 해협", "수에즈 운하"], a: 0 } },
+            { id: "ke", name: "케냐", pop: 55100000, continent: "아프리카", density: 94, stars: 3, job: "마사이마라 국립보호구역 야생동물 사진가", desc: "동아프리카의 사바나 기후. 마라톤 등 육상 강국입니다.", quiz: { q: "오랜 옛날 지각 변동으로 인해 땅이 쩍 갈라지면서 생겨난 거대한 골짜기로, 아프리카 동부를 길게 가로지르는 지형은?", options: ["동아프리카 지구대", "그랜드 캐니언", "히말라야 산맥", "알프스 산맥"], a: 0 } },
+            { id: "ug", name: "우간다", pop: 48580000, continent: "아프리카", density: 201, stars: 3, job: "빅토리아 호수 나일틸라피아 어부", desc: "아프리카 최대 호수인 빅토리아 호수를 끼고 있는 내륙국입니다.", quiz: { q: "대륙 안쪽에 갇혀 바다로 나갈 수 없는 나라들은 물고기를 잡기 위해 주로 어느 지형을 이용할까요?", options: ["커다란 호수나 강", "건조한 사막", "높은 산맥", "얼어붙은 빙하"], a: 0 } },
+            { id: "sd", name: "수단", pop: 48100000, continent: "아프리카", density: 25, stars: 4, job: "백나일강 청나일강 합류점 카페 사장", desc: "나일강 유역의 국가로 사하라 사막 남부 사헬 지대에 위치합니다.", quiz: { q: "사막 남쪽 주변 지역에서 사람들이 가축을 너무 많이 기르거나 나무를 마구 베어내어, 점차 땅이 사막으로 변해가는 환경 문제는?", options: ["사막화 현상", "엘니뇨 현상", "오존층 파괴", "산성비"], a: 0 } },
+
+            // === EUROPE (9) ===
+            { id: "ru", name: "러시아", pop: 144440000, continent: "유럽", density: 8, stars: 1, job: "시베리아 횡단열차 특별석 차장", desc: "세계에서 가장 영토가 넓은 나라. 유럽과 아시아에 걸쳐 있습니다.", quiz: { q: "겨울이 매우 길고 추워서 소나무처럼 뾰족한 잎을 가진 나무들(침엽수림)이 거대한 숲을 이루고 있는 기후는?", options: ["냉대 기후", "열대 기후", "온대 기후", "건조 기후"], a: 0 } },
+            { id: "de", name: "독일", pop: 83290000, continent: "유럽", density: 233, stars: 2, job: "아우토반 무제한 고속도로 유지보수 기사", desc: "유럽 최대 경제 대국. 자동차 산업과 맥주, 소시지가 유명합니다.", quiz: { q: "유럽 서북부 지역은 북극과 가까운 고위도임에도 불구하고 바다의 따뜻한 공기가 불어와서 겨울이 비교적 따뜻합니다. 이 기후는?", options: ["서안 해양성 기후", "지중해성 기후", "열대 우림 기후", "사바나 기후"], a: 0 } },
+            { id: "uk", name: "영국", pop: 67730000, continent: "유럽", density: 279, stars: 3, job: "런던탑 근위대(비피터) 및 빅벤 시계지기", desc: "유럽 서북부의 섬나라. 산업혁명의 발상지입니다.", quiz: { q: "대륙과 떨어져 있는 섬나라의 지리적 이점을 활용하여, 세계 여러 나라로 배를 타고 나아가 무역을 발전시키기에 가장 좋은 조건은?", options: ["해상 교통의 발달", "사막 기후의 형성", "육로 교통의 발달", "고산 기후의 형성"], a: 0 } },
+            { id: "fr", name: "프랑스", pop: 64750000, continent: "유럽", density: 118, stars: 3, job: "파리 에펠탑 조명 디자이너 겸 루브르 큐레이터", desc: "문화와 예술의 중심지. 에펠탑과 루브르 박물관이 있습니다.", quiz: { q: "지구의 중위도 지역에 속해 사계절의 변화가 뚜렷하며, 날씨가 온화하여 사람들이 가장 많이 모여 사는 기후는?", options: ["온대 기후", "한대 기후", "건조 기후", "열대 기후"], a: 0 } },
+            { id: "it", name: "이탈리아", pop: 58870000, continent: "유럽", density: 195, stars: 3, job: "로마 콜로세움 복원가 및 베네치아 곤돌라 뱃사공", desc: "장화 모양의 반도 국가. 고대 로마의 유산이 가득합니다.", quiz: { q: "여름은 햇빛이 쨍쨍하고 건조하며, 겨울은 따뜻하고 비가 내려 포도나 올리브 농사가 아주 잘 되는 유럽 남부의 기후는?", options: ["지중해성 기후", "서안 해양성 기후", "냉대 기후", "사바나 기후"], a: 0 } },
+            { id: "es", name: "스페인", pop: 47770000, continent: "유럽", density: 94, stars: 4, job: "바르셀로나 사그라다 파밀리아 건축 가우디 조수", desc: "이베리아 반도에 위치. 열정적인 플라멩코와 투우의 나라입니다.", quiz: { q: "유럽 남서부 끝에 위치하여 바다와 대륙이 만나는 곳에 자리 잡은 덕분에, 이슬람 문화와 유럽 문화가 만나 독특한 문화가 만들어진 반도는?", options: ["이베리아 반도", "발칸 반도", "스칸디나비아 반도", "이탈리아 반도"], a: 0 } },
+            { id: "ua", name: "우크라이나", pop: 36740000, continent: "유럽", density: 61, stars: 4, job: "흑토(체르노젬) 지대 대규모 밀밭 트랙터 기사", desc: "동유럽의 곡창지대. 세계적인 흑토 지대를 보유하고 있습니다.", quiz: { q: "동유럽에 넓게 분포하는 매우 비옥하고 검은 흙으로, 밀 농사가 아주 잘 되어 세계적인 식량 창고 역할을 하게 해준 흙의 이름은?", options: ["체르노젬(흑토)", "라테라이트(적색토)", "포드졸(회백색토)", "황토"], a: 0 } },
+            { id: "pl", name: "폴란드", pop: 36820000, continent: "유럽", density: 118, stars: 4, job: "쇼팽 콩쿠르 전속 피아노 조율사", desc: "중부 유럽 국가. 쇼팽과 코페르니쿠스의 고향입니다.", quiz: { q: "산맥 없이 평평하고 넓은 지형이 이어져 있어 농사를 짓거나 길을 만들기 좋지만, 예로부터 이웃 강대국들의 침략 통로가 되기도 쉬웠던 지형은?", options: ["평원 지대", "고원 지대", "산악 지대", "사막 지대"], a: 0 } },
+            { id: "va", name: "바티칸 시국", pop: 800, continent: "유럽", density: 1818, stars: 5, job: "스위스 근위대 신성 호위관", desc: "이탈리아 로마 안에 있는 세계에서 가장 작은 독립국. 교황청이 있습니다.", quiz: { q: "세계에는 여러 형태의 나라가 있습니다. 영토와 인구의 규모가 하나의 도시만큼 아주 작지만, 독립적인 권리를 가진 나라를 무엇이라 부를까요?", options: ["도시 국가", "연방 국가", "섬나라", "내륙국"], a: 0 } },
+
+            // === NORTH AMERICA (4) ===
+            { id: "us", name: "미국", pop: 339990000, continent: "북아메리카", density: 34, stars: 1, job: "NASA 실리콘밸리 우주탐사선 엔지니어", desc: "세계 최고의 경제 및 군사 대국. 50개의 주로 이루어져 있습니다.", quiz: { q: "북아메리카 대륙의 동쪽에 위치하며, 오랜 세월 비바람에 깎여 해발 고도가 낮고 석탄 등 지하자원이 풍부한 산맥은?", options: ["애팔래치아 산맥", "로키 산맥", "안데스 산맥", "알프스 산맥"], a: 0 } },
+            { id: "mx", name: "멕시코", pop: 128450000, continent: "북아메리카", density: 65, stars: 1, job: "마야 문명 치첸이트사 유적 탐험대장", desc: "마야와 아스텍 문명의 유적을 품고 있는 나라입니다.", quiz: { q: "과거 아메리카 대륙에서 번성했던 원주민들의 고대 문명 중, 옥수수를 재배하고 정교한 달력을 만들었던 문명은 무엇일까요?", options: ["마야 문명", "메소포타미아 문명", "황하 문명", "인더스 문명"], a: 0 } },
+            { id: "ca", name: "캐나다", pop: 38780000, continent: "북아메리카", density: 4, stars: 4, job: "로키 산맥 붉은 단풍(메이플) 시럽 채취꾼", desc: "세계에서 영토가 두 번째로 넓은 나라. 단풍잎이 상징입니다.", quiz: { q: "지구의 북반구 높은 위도에 위치해 1년 중 대부분이 눈과 얼음으로 덮여 있고, 아주 짧은 여름에만 땅이 녹아 이끼가 자라는 기후는?", options: ["툰드라 기후", "온대 기후", "열대 기후", "사바나 기후"], a: 0 } },
+            { id: "cu", name: "쿠바", pop: 11190000, continent: "북아메리카", density: 102, stars: 5, job: "아바나 올드카 택시 운전사 및 살사 댄서", desc: "카리브해에 위치한 섬나라. 올드카와 시가가 유명합니다.", quiz: { q: "북아메리카와 남아메리카 사이에 있으며, 수많은 섬들과 따뜻한 바닷물 덕분에 세계적인 휴양지로 손꼽히는 바다의 이름은?", options: ["카리브 해", "지중해", "발트 해", "홍해"], a: 0 } },
+
+            // === SOUTH AMERICA (6) ===
+            { id: "br", name: "브라질", pop: 216420000, continent: "남아메리카", density: 25, stars: 1, job: "아마존 열대우림 환경감시 헬기 조종사", desc: "남미 최대 국가. 아마존 열대우림과 삼바, 축구로 유명합니다.", quiz: { q: "적도를 지나며 1년 내내 비가 많이 내려 숲이 우거진 열대 우림 기후 지역에서, 집 안으로 열기와 습기가 올라오는 것을 막기 위해 짓는 집은?", options: ["고상 가옥", "이글루", "흙집", "동굴집"], a: 0 } },
+            { id: "co", name: "콜롬비아", pop: 52080000, continent: "남아메리카", density: 46, stars: 3, job: "안데스 산맥 고산지대 최고급 커피 농부", desc: "안데스 산맥이 지나가며, 커피 생산국으로 유명합니다.", quiz: { q: "산의 비탈진 면을 깎아 계단 모양으로 평평하게 만들어, 좁은 산지에서도 농사를 지을 수 있도록 고안된 농업 방식을 무엇이라 할까요?", options: ["계단식 농업", "플랜테이션", "유목", "온실 농업"], a: 0 } },
+            { id: "ar", name: "아르헨티나", pop: 46650000, continent: "남아메리카", density: 17, stars: 4, job: "광활한 팜파스 평원의 가우초(카우보이)", desc: "탱고의 본고장. 넓은 초원 '팜파스'에서 목축업을 합니다.", quiz: { q: "남아메리카에 넓게 펼쳐져 있는 온대 초원 지대로, 땅이 기름져서 소와 양을 풀어 기르거나 대규모로 밀 농사를 짓기 좋은 이곳은?", options: ["팜파스", "사하라", "툰드라", "타이가"], a: 0 } },
+            { id: "pe", name: "페루", pop: 34350000, continent: "남아메리카", density: 27, stars: 5, job: "마추픽추 잉카 트레일 산악 가이드", desc: "안데스 산맥의 고대 잉카 제국 유적 '마추픽추'가 있습니다.", quiz: { q: "남아메리카 서부 해안을 따라 남북으로 아주 길게 뻗어 있으며, 지진과 화산이 자주 일어나는 높고 험준한 산맥은?", options: ["안데스 산맥", "로키 산맥", "히말라야 산맥", "우랄 산맥"], a: 0 } },
+            { id: "ve", name: "베네수엘라", pop: 28830000, continent: "남아메리카", density: 32, stars: 5, job: "마라카이보 호수 해상 유전 시추공", desc: "석유 매장량이 세계 최고 수준인 남미 국가입니다.", quiz: { q: "바다나 호수 밑바닥에 많이 묻혀 있으며, 현대 사회에서 자동차 연료나 전기를 만드는 데 가장 많이 쓰이는 에너지 자원은?", options: ["석유", "철광석", "우라늄", "다이아몬드"], a: 0 } },
+            { id: "bo", name: "볼리비아", pop: 12380000, continent: "남아메리카", density: 11, stars: 5, job: "우유니 소금사막 사진 작가 및 지프차 기사", desc: "남미의 내륙국. 하늘을 반사하는 거대한 '우유니 소금사막'이 있습니다.", quiz: { q: "해발 고도가 매우 높은 산지에 위치해 있어서, 적도와 가깝지만 1년 내내 봄처럼 선선한 날씨가 나타나는 기후를 무엇이라 할까요?", options: ["고산 기후", "건조 기후", "열대 기후", "온대 기후"], a: 0 } },
+
+            // === OCEANIA (2) ===
+            { id: "au", name: "호주", pop: 26430000, continent: "오세아니아", density: 3, stars: 5, job: "아웃백 사막 야생 캥거루 구조대원", desc: "오세아니아 대륙을 차지한 거대한 나라. 캥거루와 코알라의 고향입니다.", quiz: { q: "오세아니아 대륙에 캥거루나 코알라처럼 다른 곳에서는 볼 수 없는 독특한 동물들이 살고 있는 지리적 이유는 무엇일까요?", options: ["오랜 시간 다른 대륙과 바다로 떨어져 있어서", "기온이 너무 낮아서", "산맥이 험준해서", "화산 폭발이 없어서"], a: 0 } },
+            { id: "nz", name: "뉴질랜드", pop: 5220000, continent: "오세아니아", density: 19, stars: 5, job: "반지의 제왕 호빗 마을 특수효과 담당", desc: "아름다운 자연을 가진 두 개의 섬나라. 마오리족 문화가 있습니다.", quiz: { q: "환태평양 조산대에 속해 있어 땅속의 뜨거운 열기 때문에 땅 위로 뜨거운 물이나 수증기가 뿜어져 나오는 화산 지형을 무엇이라 할까요?", options: ["간헐천(온천)", "빙하", "삼각주", "오아시스"], a: 0 } }
+        ];
+
+        // ----------------------------------------------------
+        // 2. STATE & CONFIG
+        // ----------------------------------------------------
+        let userCollection = []; 
+        let solvedQuizzes = []; 
+        let totalSpins = 0; 
+        
+        let allSpinsHistory = []; // 누적 환생 기록 추적용
+        let hasSeenCollectionPopup = false; // 50개국 수집 팝업 표시 여부
+        let hasSeenMasterPopup = false; // 50개국+퀴즈 마스터 팝업 표시 여부
+        
+        const MAX_PITY = 8;
+        let pityCounter = MAX_PITY;
+        
+        const MAX_REPLAYS = 3;
+        let celebrationReplayCount = 0;
+
+        let activeReincarnatedCountry = null; 
+        let quizCorrectCount = 0; 
+        let currentPokedexFilter = 'all';
+
+        // Continent Progress
+        let continentMissions = {
+            "아시아": { current: 0, target: 20, halfClaimed: false, fullClaimed: false },
+            "아프리카": { current: 0, target: 9, halfClaimed: false, fullClaimed: false },
+            "유럽": { current: 0, target: 9, halfClaimed: false, fullClaimed: false },
+            "북아메리카": { current: 0, target: 4, halfClaimed: false, fullClaimed: false },
+            "남아메리카": { current: 0, target: 6, halfClaimed: false, fullClaimed: false },
+            "오세아니아": { current: 0, target: 2, halfClaimed: false, fullClaimed: false }
+        };
+
+        // Charts
+        let theoreticalChart = null;
+        let actualChart = null;
+
+        // Sound
+        async function playFanfare(isUltimate) {
+            try {
+                await Tone.start();
+                const synth = new Tone.PolySynth(Tone.Synth, {
+                    oscillator: { type: 'triangle' },
+                    envelope: { attack: 0.05, decay: 0.1, sustain: 0.3, release: 1 }
+                }).toDestination();
+                synth.volume.value = -10;
+                
+                const now = Tone.now();
+                if (isUltimate) {
+                    synth.triggerAttackRelease(["C4", "E4", "G4"], "8n", now);
+                    synth.triggerAttackRelease(["C4", "E4", "G4"], "8n", now + 0.2);
+                    synth.triggerAttackRelease(["C4", "E4", "G4"], "8n", now + 0.4);
+                    synth.triggerAttackRelease(["C4", "E4", "G4", "C5"], "2n", now + 0.6);
+                } else {
+                    synth.triggerAttackRelease(["G4", "B4", "D5"], "8n", now);
+                    synth.triggerAttackRelease(["G4", "B4", "D5", "G5"], "2n", now + 0.25);
+                }
+            } catch (e) {
+                console.warn("Audio error:", e);
+            }
+        }
+
+        // Helper: Number Formatter
+        function formatPop(pop) {
+            if (pop >= 100000000) {
+                const eok = Math.floor(pop / 100000000);
+                const man = Math.floor((pop % 100000000) / 10000);
+                return eok + "억" + (man > 0 ? " " + man.toLocaleString() + "만" : "");
+            } else if (pop < 10000) {
+                return pop.toLocaleString();
+            } else {
+                return Math.floor(pop / 10000).toLocaleString() + "만";
+            }
+        }
+
+        // Helper: Flag URL
+        function getFlagUrl(id) {
+            const map = { 'uk': 'gb' }; // UK exception mapping for flagcdn
+            const code = map[id] || id;
+            return `https://flagcdn.com/w80/${code}.png`;
+        }
+
+        // Helper: Rarity Label
+        function getRarityLabel(stars) {
+            switch(stars) {
+                case 1: return "흔함";
+                case 2: return "보통";
+                case 3: return "희귀";
+                case 4: return "영웅";
+                case 5: return "초희귀";
+                default: return "알 수 없음";
+            }
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        // Initialize
+        function init() {
+            renderPokedex();
+            updateStatsCounters();
+            renderContinentMissions();
+            initCharts();
+        }
+
+        // ----------------------------------------------------
+        // 3. ROULETTE LOGIC
+        // ----------------------------------------------------
+        function spinRoulette() {
+            const spinBtn = document.getElementById('spin-btn');
+            if (spinBtn.disabled) return;
+
+            // Quiz Lock Check
+            if (activeReincarnatedCountry && !solvedQuizzes.includes(activeReincarnatedCountry.id)) {
+                return; // Disabled by state
+            }
+
+            // Start animation
+            spinBtn.disabled = true;
+            document.getElementById('spin-btn-text').innerHTML = '<i class="fa-solid fa-spinner fa-spin text-white mr-2"></i> 환생하는 중...';
+            
+            const cardInner = document.getElementById('card-inner');
+            cardInner.classList.remove('rotate-y-180');
+
+            setTimeout(() => {
+                let country = getNextCountry();
+                let isPity = false;
+
+                pityCounter--;
+                if (pityCounter <= 0) {
+                    const uncollected = COUNTRIES.filter(c => !userCollection.includes(c.id));
+                    if (uncollected.length > 0) {
+                        country = uncollected[Math.floor(Math.random() * uncollected.length)];
+                        isPity = true;
+                    }
+                    pityCounter = MAX_PITY;
+                }
+
+                if (!userCollection.includes(country.id)) {
+                    userCollection.push(country.id);
+                    checkContinentMissions(country);
+                    pityCounter = MAX_PITY; // reset pity on new card
+                }
+                
+                totalSpins++;
+                allSpinsHistory.push(country.id);
+                activeReincarnatedCountry = country;
+
+                // Flip and Show
+                setTimeout(() => {
+                    updateCardUI(country, isPity, null);
+                    cardInner.classList.add('rotate-y-180');
+                    
+                    updateStatsCounters();
+                    renderContinentMissions();
+                    updateStatsCharts();
+
+                    setTimeout(() => {
+                        updateSpinButtonState();
+                        
+                        // 50개국 수집 완료 시 팝업 및 세레모니 트리거
+                        if (userCollection.length >= 50 && !hasSeenCompletionPopup) {
+                            hasSeenCompletionPopup = true;
+                            showCompletionPopup();
+                        }
+                    }, 500);
+                }, 400);
+
+            }, 600);
+        }
+
+        function getNextCountry() {
+            // 전체 세계 인구가 아닌, 설정된 50개 국가 인구의 총합을 기준으로 확률 재분배 (뉴질랜드 버그 해결)
+            const actualTotalPop = COUNTRIES.reduce((sum, c) => sum + c.pop, 0);
+            let r = Math.random() * actualTotalPop;
+            let acc = 0;
+            for (let c of COUNTRIES) {
+                acc += c.pop;
+                if (r <= acc) return c;
+            }
+            return COUNTRIES[COUNTRIES.length - 1];
+        }
+
+        function updateCardUI(country, isPity, customTitle) {
+            document.getElementById('card-name').innerText = customTitle ? customTitle : country.name;
+            document.getElementById('card-continent').innerText = country.continent;
+            
+            document.getElementById('card-stars').innerText = '★'.repeat(country.stars);
+            document.getElementById('card-rarity').innerText = getRarityLabel(country.stars);
+            document.getElementById('card-flag').src = getFlagUrl(country.id);
+            
+            document.getElementById('card-pop').innerText = formatPop(country.pop) + " 명";
+            document.getElementById('card-density').innerText = country.density.toLocaleString() + " 명/km²";
+            document.getElementById('card-share').innerText = ((country.pop / TOTAL_WORLD_POP) * 100).toFixed(2) + "%";
+            
+            document.getElementById('card-job').innerText = country.job;
+            document.getElementById('card-desc').innerText = country.desc;
+
+            const banner = document.getElementById('card-banner');
+            if (isPity) {
+                banner.classList.remove('hidden');
+                banner.innerText = "✨ 천장 확정 등장! ✨";
+            } else if (customTitle) {
+                banner.classList.remove('hidden');
+                banner.innerText = "🎁 보상 이벤트 획득! 🎁";
+            } else {
+                banner.classList.add('hidden');
+            }
+        }
+
+        function updateSpinButtonState() {
+            const spinBtn = document.getElementById('spin-btn');
+            const playArea = document.getElementById('play-area');
+            const masterArea = document.getElementById('master-area');
+            const inlineCeremonyBtn = document.getElementById('inline-ceremony-btn');
+            
+            if (!spinBtn) return;
+
+            // 50개국 수집 및 50개 퀴즈 완료 시 (Master State)
+            if (userCollection.length >= 50 && solvedQuizzes.length >= 50) {
+                playArea.classList.add('hidden');
+                playArea.classList.remove('flex');
+                masterArea.classList.remove('hidden');
+                masterArea.classList.add('flex');
+                
+                if (celebrationReplayCount >= MAX_REPLAYS) {
+                    inlineCeremonyBtn.disabled = true;
+                    inlineCeremonyBtn.innerText = "세레모니 종료 (최대 3회)";
+                    inlineCeremonyBtn.className = "w-full max-w-[200px] mx-auto bg-slate-300 text-slate-500 font-black py-3 px-6 rounded-xl shadow-none cursor-not-allowed";
+                } else {
+                    inlineCeremonyBtn.disabled = false;
+                    inlineCeremonyBtn.innerText = `✨ 세레모니 보기! (${MAX_REPLAYS - celebrationReplayCount}회 남음)`;
+                    inlineCeremonyBtn.className = "w-full max-w-[200px] mx-auto bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white font-black py-3 px-6 rounded-xl shadow-lg transition-all";
+                }
+            } 
+            // 그 외 일반 진행 상태
+            else {
+                playArea.classList.remove('hidden');
+                playArea.classList.add('flex');
+                masterArea.classList.add('hidden');
+                masterArea.classList.remove('flex');
+                
+                if (userCollection.length >= 50) {
+                    spinBtn.disabled = false;
+                    spinBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+                    spinBtn.className = "w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-4 px-6 rounded-2xl shadow-lg transition-all flex items-center justify-center text-sm";
+                    document.getElementById('spin-btn-text').innerText = "🏆 완판 완료! 퀴즈를 모두 풀어보세요!";
+                    spinBtn.onclick = () => showCompletionPopup();
+                } else if (activeReincarnatedCountry && !solvedQuizzes.includes(activeReincarnatedCountry.id)) {
+                    spinBtn.disabled = true;
+                    spinBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                    document.getElementById('spin-btn-text').innerText = "🔒 퀴즈를 풀어야 다음 환생 가능!";
+                    spinBtn.onclick = spinRoulette;
+                } else {
+                    spinBtn.disabled = false;
+                    spinBtn.className = "w-full bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-black py-4 px-6 rounded-2xl shadow-lg hover:shadow-xl transition-all transform active:scale-95 flex items-center justify-center text-lg";
+                    document.getElementById('spin-btn-text').innerText = "✨ 룰렛 돌리기 (태어나기!)";
+                    spinBtn.onclick = spinRoulette;
+                }
+            }
+        }
+
+        // ----------------------------------------------------
+        // 4. QUIZ LOGIC (Shuffled Options)
+        // ----------------------------------------------------
+        function openActiveCardQuiz() {
+            if (!activeReincarnatedCountry) return;
+            showQuiz(activeReincarnatedCountry.id);
+        }
+
+        function showQuiz(countryId) {
+            const country = COUNTRIES.find(c => c.id === countryId);
+            const modal = document.getElementById('quiz-modal');
+            const resArea = document.getElementById('quiz-result-area');
+            const resText = document.getElementById('quiz-result-text');
+            
+            document.getElementById('quiz-modal-continent').innerText = country.continent;
+            document.getElementById('quiz-modal-country-name').innerText = country.name;
+            document.getElementById('quiz-modal-job').innerText = country.job;
+            document.getElementById('quiz-question').innerText = `Q. ${country.quiz.q}`;
+            
+            const optContainer = document.getElementById('quiz-options');
+            optContainer.innerHTML = '';
+            resArea.classList.add('hidden');
+
+            const isSolved = solvedQuizzes.includes(country.id);
+
+            // Shuffle Quiz Options
+            let options = [...country.quiz.options];
+            let correctText = options[country.quiz.a];
+            
+            // Randomly shuffle options array
+            for (let i = options.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [options[i], options[j]] = [options[j], options[i]];
+            }
+            let newCorrectIdx = options.indexOf(correctText);
+
+            options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-3 rounded-xl border-2 transition-all font-bold text-sm " + 
+                    (isSolved ? "bg-slate-50 border-slate-200 text-slate-500 cursor-default" : "bg-white border-slate-200 text-slate-700 hover:border-indigo-400 hover:bg-indigo-50");
+                btn.innerText = `${idx + 1}. ${opt}`;
+                
+                if (isSolved && idx === newCorrectIdx) {
+                    btn.className = "w-full text-left p-3 rounded-xl border-2 font-bold text-sm bg-emerald-100 border-emerald-400 text-emerald-800";
+                    btn.innerHTML = `<i class="fa-solid fa-check mr-2"></i> ${idx + 1}. ${opt}`;
+                }
+
+                if (!isSolved) {
+                    btn.onclick = () => checkQuizAnswer(idx, newCorrectIdx, country.id, btn);
+                }
+                optContainer.appendChild(btn);
+            });
+
+            if (isSolved) {
+                resArea.classList.remove('hidden');
+                resText.className = "text-xs text-center font-bold text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-200";
+                resText.innerText = "✅ 이미 정답을 맞힌 퀴즈입니다.";
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function checkQuizAnswer(selectedIdx, correctIdx, countryId, btnEl) {
+            const resArea = document.getElementById('quiz-result-area');
+            const resText = document.getElementById('quiz-result-text');
+            resArea.classList.remove('hidden');
+
+            if (selectedIdx === correctIdx) {
+                if (!solvedQuizzes.includes(countryId)) {
+                    solvedQuizzes.push(countryId);
+                    quizCorrectCount++;
+                    
+                    const modCount = quizCorrectCount % 8;
+                    if (modCount === 0 && quizCorrectCount > 0) {
+                        resText.className = "text-xs text-center font-bold text-rose-700 bg-rose-50 p-2 rounded-lg border border-rose-200";
+                        resText.innerText = `🎉 정답! 상단의 [✨ 희귀 카드 뽑기!] 버튼을 누르세요!`;
+                    } else {
+                        resText.className = "text-xs text-center font-bold text-emerald-700 bg-emerald-50 p-2 rounded-lg border border-emerald-200";
+                        resText.innerText = `🎉 정답입니다! (누적 정답 ${quizCorrectCount}개)`;
+                    }
+                    
+                    btnEl.className = "w-full text-left p-3 rounded-xl border-2 font-bold text-sm bg-emerald-100 border-emerald-400 text-emerald-800";
+                    btnEl.innerHTML = `<i class="fa-solid fa-check mr-2"></i> ${btnEl.innerText}`;
+
+                    // [버그 수정]: 마지막 50번째 퀴즈를 도감에서 풀었을 때 마스터 팝업 강제 호출
+                    if (userCollection.length >= 50 && solvedQuizzes.length >= 50 && !hasSeenMasterPopup) {
+                        hasSeenMasterPopup = true;
+                        setTimeout(() => showCompletionPopup(), 1000);
+                    }
+                }
+                
+                updateStatsCounters();
+                renderPokedex(); // update badges
+                updateSpinButtonState();
+            } else {
+                resText.className = "text-xs text-center font-bold text-rose-700 bg-rose-50 p-2 rounded-lg border border-rose-200";
+                resText.innerText = "❌ 오답입니다. 다시 도전해보세요!";
+                btnEl.classList.add('bg-rose-50', 'border-rose-300', 'text-rose-700');
+                setTimeout(() => {
+                    btnEl.classList.remove('bg-rose-50', 'border-rose-300', 'text-rose-700');
+                }, 800);
+            }
+        }
+
+        function checkQuizRewardClick() {
+            if (quizCorrectCount > 0 && quizCorrectCount % 8 === 0) {
+                showRewardPopup('quiz');
+            }
+        }
+
+        // ----------------------------------------------------
+        // 5. CONTINENT MISSIONS & QUIZ
+        // ----------------------------------------------------
+        let currentContinentQuizState = null; // { contName, type }
+
+        function checkContinentMissions(newCountry) {
+            const cont = newCountry.continent;
+            const collectedInCont = COUNTRIES.filter(c => c.continent === cont && userCollection.includes(c.id)).length;
+            continentMissions[cont].current = collectedInCont;
+            
+            const target = continentMissions[cont].target;
+            
+            if (collectedInCont >= Math.ceil(target / 2) && !continentMissions[cont].halfClaimed) {
+                // Notifying half completion
+            }
+            if (collectedInCont >= target && !continentMissions[cont].fullClaimed) {
+                // Notifying full completion
+            }
+        }
+
+        function renderContinentMissions() {
+            const container = document.getElementById('continent-missions');
+            container.innerHTML = '';
+            
+            for (const [cont, data] of Object.entries(continentMissions)) {
+                const collected = COUNTRIES.filter(c => c.continent === cont && userCollection.includes(c.id)).length;
+                data.current = collected;
+                const percent = (data.current / data.target) * 100;
+                
+                const isHalfReady = data.current >= Math.ceil(data.target / 2) && !data.halfClaimed;
+                const isFullReady = data.current >= data.target && !data.fullClaimed;
+
+                const box = document.createElement('div');
+                box.className = "bg-white p-2 rounded-xl border border-slate-200 shadow-sm relative flex flex-col justify-center";
+                
+                let btnHtml = '';
+                if (isHalfReady) {
+                    btnHtml = `<button onclick="startContinentQuiz('${cont}', 'half')" class="mt-1.5 w-full py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 hover:bg-amber-200 rounded border border-amber-300 animate-pulse-border">50% 퀴즈</button>`;
+                } else if (isFullReady) {
+                    btnHtml = `<button onclick="startContinentQuiz('${cont}', 'full')" class="mt-1.5 w-full py-0.5 text-[9px] font-bold bg-amber-100 text-amber-700 hover:bg-amber-200 rounded border border-amber-300 animate-pulse-border">100% 퀴즈</button>`;
+                }
+
+                box.innerHTML = `
+                    <div class="flex justify-between items-center mb-1">
+                        <span class="font-bold text-[10px] text-slate-700 truncate mr-1">${cont}</span>
+                        <span class="text-[9px] font-bold text-slate-500 shrink-0">${data.current}/${data.target}</span>
+                    </div>
+                    <div class="w-full bg-slate-100 rounded-full h-1 mt-1">
+                        <div class="bg-indigo-500 h-1 rounded-full transition-all" style="width: ${percent}%"></div>
+                    </div>
+                    ${btnHtml}
+                `;
+                container.appendChild(box);
+            }
+        }
+
+        function startContinentQuiz(contName, type) {
+            currentContinentQuizState = { contName, type };
+            const modal = document.getElementById('continent-quiz-modal');
+            
+            const qData = getContinentQuizData(contName, type);
+            document.getElementById('cont-quiz-q').innerText = `Q. ${qData.q}`;
+            
+            const optContainer = document.getElementById('cont-quiz-options');
+            optContainer.innerHTML = '';
+            document.getElementById('cont-quiz-result').classList.add('hidden');
+
+            qData.options.forEach((opt, idx) => {
+                const btn = document.createElement('button');
+                btn.className = "w-full text-left p-3 rounded-xl border-2 transition-all font-bold text-sm bg-white border-slate-200 text-slate-700 hover:border-amber-400 hover:bg-amber-50";
+                btn.innerText = `${idx + 1}. ${opt}`;
+                btn.onclick = () => handleContinentQuizAnswer(idx, qData.a, btn);
+                optContainer.appendChild(btn);
+            });
+
+            modal.classList.remove('hidden');
+        }
+
+        function handleContinentQuizAnswer(selected, correct, btnEl) {
+            const resArea = document.getElementById('cont-quiz-result');
+            resArea.classList.remove('hidden');
+
+            if (selected === correct) {
+                resArea.className = "mt-4 text-center font-bold text-sm p-3 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200";
+                resArea.innerText = "🎉 대륙 퀴즈 통과! 보상 팝업을 띄웁니다!";
+                
+                btnEl.className = "w-full text-left p-3 rounded-xl border-2 font-bold text-sm bg-emerald-100 border-emerald-400 text-emerald-800";
+                btnEl.innerHTML = `<i class="fa-solid fa-check mr-2"></i> ${btnEl.innerText}`;
+                
+                // 1초 후 모달을 닫고 보상 팝업 표시
+                setTimeout(() => {
+                    closeModal('continent-quiz-modal');
+                    
+                    const state = currentContinentQuizState;
+                    if (state.type === 'half') {
+                        continentMissions[state.contName].halfClaimed = true;
+                    } else {
+                        continentMissions[state.contName].fullClaimed = true;
+                    }
+                    
+                    showRewardPopup('continent', state.contName);
+                    renderContinentMissions(); // 미션 현황판 버튼 상태 갱신
+                }, 1000);
+            } else {
+                resArea.className = "mt-4 text-center font-bold text-sm p-3 rounded-xl bg-rose-50 text-rose-700 border border-rose-200";
+                resArea.innerText = "❌ 오답입니다. 다시 도전해보세요!";
+                btnEl.classList.add('bg-rose-50', 'border-rose-300', 'text-rose-700');
+                setTimeout(() => {
+                    btnEl.classList.remove('bg-rose-50', 'border-rose-300', 'text-rose-700');
+                }, 800);
+            }
+        }
+
+        function getContinentQuizData(cont, type) {
+            const qs = {
+                "아시아": { 
+                    half: { q: "전 세계 인구의 절반 이상이 살고 있으며, 세계에서 가장 면적이 넓고 인구가 많은 대륙은 어디일까요?", options: ["아시아", "아프리카", "유럽", "북아메리카"], a: 0 },
+                    full: { q: "계절에 따라 불어오는 방향이 바뀌는 바람(계절풍)의 영향을 받아, 비가 많이 내리는 여름철을 이용해 '벼농사'가 가장 널리 발달한 대륙은?", options: ["아시아", "유럽", "오세아니아", "남아메리카"], a: 0 }
+                },
+                "아프리카": { 
+                    half: { q: "사하라 사막과 같이 거대한 사막과 동물이 뛰어노는 사바나 초원이 넓게 펼쳐져 있는 대륙은 어디일까요?", options: ["아프리카", "유럽", "북아메리카", "오세아니아"], a: 0 },
+                    full: { q: "적도를 가로지르며 더운 기후가 나타나고, 먼 옛날 인류의 조상이 가장 먼저 나타난 것으로 알려진 대륙은?", options: ["아프리카", "유럽", "아시아", "남아메리카"], a: 0 }
+                },
+                "유럽": { 
+                    half: { q: "대륙의 면적은 비교적 좁지만, 일찍부터 산업이 발달하여 여러 선진국들이 옹기종기 모여 있는 대륙은?", options: ["유럽", "아시아", "아프리카", "남아메리카"], a: 0 },
+                    full: { q: "여러 나라가 마치 하나의 나라처럼 경제와 정치를 합치고 협력하기 위해 '유럽 연합(EU)'이라는 기구를 만든 대륙은?", options: ["유럽", "아프리카", "북아메리카", "오세아니아"], a: 0 }
+                },
+                "북아메리카": { 
+                    half: { q: "지구의 북반구에 위치하며, 미국과 캐나다처럼 세계에서 손꼽히게 영토가 넓은 나라들이 있는 대륙은?", options: ["북아메리카", "남아메리카", "아프리카", "유럽"], a: 0 },
+                    full: { q: "서쪽으로는 험준한 로키 산맥이 뻗어 있고, 북극과 가까운 추운 곳부터 남쪽의 따뜻한 곳까지 다양한 기후가 나타나는 대륙은?", options: ["북아메리카", "아시아", "유럽", "오세아니아"], a: 0 }
+                },
+                "남아메리카": { 
+                    half: { q: "세계에서 가장 유량이 많은 아마존 강과 거대한 열대 우림이 펼쳐져 있는 대륙은 어디일까요?", options: ["남아메리카", "유럽", "아시아", "북아메리카"], a: 0 },
+                    full: { q: "서쪽 해안을 따라 안데스 산맥이 길게 뻗어 있으며, 과거 원주민들이 세운 잉카 문명이 발달했던 대륙은?", options: ["남아메리카", "아프리카", "유럽", "오세아니아"], a: 0 }
+                },
+                "오세아니아": { 
+                    half: { q: "지구상의 6대륙 중에서 가장 크기가 작으며, 여러 개의 섬들로 이루어진 대륙은 어디일까요?", options: ["오세아니아", "유럽", "남아메리카", "아프리카"], a: 0 },
+                    full: { q: "오랜 시간 동안 바다로 둘러싸인 채 다른 대륙과 떨어져 있어서, 캥거루나 코알라처럼 이곳에서만 볼 수 있는 독특한 동물들이 살고 있는 대륙은?", options: ["오세아니아", "아시아", "북아메리카", "유럽"], a: 0 }
+                }
+            };
+            return type === 'half' ? qs[cont].half : qs[cont].full;
+        }
+
+        // ----------------------------------------------------
+        // 6. REWARDS (Modal & Pull)
+        // ----------------------------------------------------
+        function showRewardPopup(type, contName = "") {
+            const popup = document.getElementById('reward-popup');
+            const title = document.getElementById('reward-popup-title');
+            const desc = document.getElementById('reward-popup-desc');
+            const btn = document.getElementById('reward-pull-btn');
+
+            if (type === 'quiz') {
+                title.innerText = "🎁 퀴즈 마스터 보상!";
+                desc.innerText = "퀴즈를 8개 정답하여 희귀 국가 뽑기 기회를 얻었습니다!";
+                btn.onclick = () => claimReward(type);
+            } else {
+                title.innerText = "🌍 대륙 탐험 보상!";
+                desc.innerText = `${contName} 대륙 미션을 달성하여 희귀 카드를 뽑습니다!`;
+                btn.onclick = () => claimReward(type, contName);
+            }
+
+            popup.classList.remove('hidden');
+        }
+
+        function claimReward(type, contName) {
+            closeModal('reward-popup');
+            
+            if (type === 'quiz') {
+                quizCorrectCount++; // increment to block repeated trigger until next 8
+            }
+            
+            const spinBtn = document.getElementById('spin-btn');
+            spinBtn.disabled = true;
+            
+            const cardInner = document.getElementById('card-inner');
+            cardInner.classList.remove('rotate-y-180');
+            switchTab('reincarnation');
+
+            setTimeout(() => {
+                const uncollected = COUNTRIES.filter(c => !userCollection.includes(c.id));
+                let rewardCountry = COUNTRIES[0];
+                
+                if (uncollected.length > 0) {
+                    const sorted = uncollected.sort((a,b) => b.stars - a.stars);
+                    rewardCountry = sorted[0]; // give highest star uncollected
+                } else {
+                    rewardCountry = COUNTRIES[Math.floor(Math.random() * COUNTRIES.length)];
+                }
+
+                if (!userCollection.includes(rewardCountry.id)) {
+                    userCollection.push(rewardCountry.id);
+                    checkContinentMissions(rewardCountry);
+                }
+
+                activeReincarnatedCountry = rewardCountry;
+                totalSpins++;
+                allSpinsHistory.push(rewardCountry.id);
+
+                setTimeout(() => {
+                    updateCardUI(rewardCountry, false, `${rewardCountry.name} (보상 획득!)`);
+                    cardInner.classList.add('rotate-y-180');
+                    
+                    updateStatsCounters();
+                    renderContinentMissions();
+                    updateStatsCharts();
+                    
+                    setTimeout(() => {
+                        updateSpinButtonState();
+                        
+                        // 50개국 수집 완료 시 팝업 트리거
+                        if (userCollection.length >= 50 && !hasSeenCollectionPopup) {
+                            hasSeenCollectionPopup = true;
+                            showCompletionPopup();
+                        }
+                    }, 500);
+                }, 400);
+
+            }, 600);
+        }
+
+        // ----------------------------------------------------
+        // 7. POKEDEX RENDERING
+        // ----------------------------------------------------
+        function setFilter(continent) {
+            currentPokedexFilter = continent;
+            const filters = ['all', '아시아', '아프리카', '유럽', '북아메리카', '남아메리카', '오세아니아'];
+            filters.forEach(f => {
+                const btn = document.getElementById(`filter-${f}`);
+                if (!btn) return;
+                if (f === continent) {
+                    btn.className = "px-4 py-1.5 rounded-full text-sm font-bold transition-colors bg-indigo-600 text-white whitespace-nowrap shadow-sm";
+                } else {
+                    btn.className = "px-4 py-1.5 rounded-full text-sm font-bold transition-colors bg-slate-200 text-slate-600 hover:bg-slate-300 whitespace-nowrap shadow-sm";
+                }
+            });
+            renderPokedex();
+        }
+
+        function renderPokedex() {
+            const grid = document.getElementById('pokedex-grid');
+            grid.innerHTML = '';
+            
+            COUNTRIES.filter(c => currentPokedexFilter === 'all' || c.continent === currentPokedexFilter).forEach(country => {
+                const isCollected = userCollection.includes(country.id);
+                const isSolved = solvedQuizzes.includes(country.id);
+                
+                const card = document.createElement('div');
+                card.className = `rounded-xl p-3 border transition-all cursor-pointer relative flex flex-col justify-between ${
+                    isCollected 
+                    ? 'bg-white border-slate-200 hover:border-indigo-400 hover:shadow-md' 
+                    : 'bg-slate-100 border-slate-200 opacity-50 grayscale hover:opacity-70'
+                }`;
+
+                let badgeHtml = '';
+                if (isCollected) {
+                    if (isSolved) badgeHtml = `<span class="absolute top-2 right-2 bg-emerald-100 text-emerald-700 border border-emerald-200 text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm z-10">✅ 완료</span>`;
+                    else badgeHtml = `<span class="absolute top-2 right-2 bg-rose-100 text-rose-700 border border-rose-200 text-[9px] font-bold px-1.5 py-0.5 rounded shadow-sm animate-pulse z-10">✏️ 퀴즈</span>`;
+                }
+
+                card.onclick = () => {
+                    if (isCollected) showQuiz(country.id);
+                };
+
+                card.innerHTML = `
+                    ${badgeHtml}
+                    <div class="mb-2 flex flex-col">
+                        <div class="text-[10px] flex items-center gap-1 mb-1">
+                            <span class="text-amber-500 font-bold">${isCollected ? '★'.repeat(country.stars) : '???'}</span>
+                            <span class="text-[9px] text-slate-400 font-bold bg-slate-100 px-1 rounded">${isCollected ? getRarityLabel(country.stars) : '?'}</span>
+                        </div>
+                        <h4 class="font-black text-sm text-slate-900 line-clamp-1 flex items-center gap-1.5 mt-1">
+                            ${isCollected ? `<img src="${getFlagUrl(country.id)}" class="w-5 h-3.5 rounded-sm shadow-sm border border-slate-200 object-cover" />` : ''}
+                            ${isCollected ? country.name : '미발견 국가'}
+                        </h4>
+                        <p class="text-[10px] text-slate-500 mt-0.5">${country.continent}</p>
+                    </div>
+                    <div class="mt-2 pt-2 border-t border-slate-100 space-y-1">
+                        <div class="flex justify-between items-center text-[10px]">
+                            <span class="text-slate-500">인구수</span>
+                            <span class="font-bold text-slate-700 font-mono">${isCollected ? formatPop(country.pop) : '?'} 명</span>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px]">
+                            <span class="text-slate-500">인구밀도</span>
+                            <span class="font-bold text-amber-600 font-mono">${isCollected ? country.density.toLocaleString() : '?'} /km²</span>
+                        </div>
+                        <div class="flex justify-between items-center text-[10px]">
+                            <span class="text-slate-500">인구 비중</span>
+                            <span class="font-bold text-indigo-600 font-mono">${isCollected ? ((country.pop / TOTAL_WORLD_POP) * 100).toFixed(2) : '?'}%</span>
+                        </div>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // ----------------------------------------------------
+        // 8. STATS & CHARTS
+        // ----------------------------------------------------
+        function updateStatsCounters() {
+            document.getElementById('total-spins').innerText = totalSpins;
+            document.getElementById('collection-count').innerText = userCollection.length;
+            
+            const pb = (pityCounter / MAX_PITY) * 100;
+            document.getElementById('pity-bar').style.width = `${100 - pb}%`;
+            document.getElementById('pity-text').innerText = `남은 횟수: ${pityCounter}회`;
+
+            const mod = quizCorrectCount % 8;
+            const isRewardReady = quizCorrectCount > 0 && mod === 0;
+            
+            const container = document.getElementById('quiz-reward-container');
+            const title = document.getElementById('quiz-reward-title');
+            const text = document.getElementById('quiz-reward-text');
+            const desc = document.getElementById('quiz-reward-desc');
+            
+            if (isRewardReady) {
+                container.className = "flex-1 bg-gradient-to-br from-rose-500 to-pink-500 rounded-xl border-2 border-rose-400 p-2.5 flex items-center justify-between shadow-lg cursor-pointer transition-all animate-pulse";
+                title.className = "text-white font-black text-[11px] drop-shadow-sm";
+                title.innerText = "✨ 희귀 카드 뽑기!";
+                desc.className = "text-[9px] text-rose-100 font-bold mt-0.5";
+                text.className = "text-center font-black text-rose-600 font-mono text-sm bg-white px-2 py-0.5 rounded-md shadow-sm border border-rose-100";
+                text.innerText = "터치!";
+            } else {
+                container.className = "flex-1 bg-emerald-50 rounded-xl border border-emerald-100 p-2.5 flex items-center justify-between shadow-sm cursor-pointer hover:bg-emerald-100 transition-colors";
+                title.className = "text-emerald-800 font-black text-[11px]";
+                title.innerText = "🎁 퀴즈 보상 (8개)";
+                desc.className = "text-[9px] text-emerald-600 font-bold mt-0.5";
+                text.className = "text-center font-black text-emerald-700 font-mono text-sm bg-white px-2 py-0.5 rounded-md shadow-sm border border-emerald-100";
+                text.innerText = `${mod} / 8`;
+            }
+        }
+
+        function initCharts() {
+            const ctxTheo = document.getElementById('chart-theoretical').getContext('2d');
+            const ctxAct = document.getElementById('chart-actual').getContext('2d');
+
+            const contNames = Object.keys(continentMissions);
+            const colors = ['#f59e0b', '#10b981', '#3b82f6', '#8b5cf6', '#ef4444', '#14b8a6'];
+
+            // Theoretical (By actual total pop in our 50 countries data)
+            let theoData = [0,0,0,0,0,0];
+            COUNTRIES.forEach(c => {
+                const idx = contNames.indexOf(c.continent);
+                theoData[idx] += c.pop;
+            });
+
+            theoreticalChart = new Chart(ctxTheo, {
+                type: 'pie',
+                data: {
+                    labels: contNames,
+                    datasets: [{ data: theoData, backgroundColor: colors, borderWidth: 1 }]
+                },
+                options: { plugins: { legend: { position: 'bottom', labels: { font: {size: 10} } } } }
+            });
+
+            actualChart = new Chart(ctxAct, {
+                type: 'pie',
+                data: {
+                    labels: contNames,
+                    datasets: [{ data: [0,0,0,0,0,0], backgroundColor: colors, borderWidth: 1 }]
+                },
+                options: { plugins: { legend: { position: 'bottom', labels: { font: {size: 10} } } } }
+            });
+        }
+
+        function updateStatsCharts() {
+            if (!actualChart) return;
+            const contNames = Object.keys(continentMissions);
+            let actData = [0,0,0,0,0,0];
+            let hasData = false;
+
+            // 누적 환생 기록(allSpinsHistory)을 기반으로 그래프 업데이트
+            allSpinsHistory.forEach(id => {
+                const c = COUNTRIES.find(x => x.id === id);
+                if (c) {
+                    const idx = contNames.indexOf(c.continent);
+                    actData[idx] += 1;
+                    hasData = true;
+                }
+            });
+
+            if (hasData) {
+                document.getElementById('chart-empty-msg').classList.add('hidden');
+                actualChart.data.datasets[0].data = actData;
+                actualChart.update();
+            } else {
+                document.getElementById('chart-empty-msg').classList.remove('hidden');
+            }
+        }
+
+        // ----------------------------------------------------
+        // 9. UI HELPERS (Tabs, Ceremonies)
+        // ----------------------------------------------------
+        function switchTab(tabId) {
+            document.getElementById('view-reincarnation').classList.add('hidden');
+            document.getElementById('view-pokedex').classList.add('hidden');
+            document.getElementById('view-stats').classList.add('hidden');
+            
+            document.getElementById('tab-reincarnation').classList.replace('text-indigo-600', 'text-slate-500');
+            document.getElementById('tab-reincarnation').classList.replace('border-indigo-600', 'border-transparent');
+            
+            document.getElementById('tab-pokedex').classList.replace('text-indigo-600', 'text-slate-500');
+            document.getElementById('tab-pokedex').classList.replace('border-indigo-600', 'border-transparent');
+
+            document.getElementById('tab-stats').classList.replace('text-indigo-600', 'text-slate-500');
+            document.getElementById('tab-stats').classList.replace('border-indigo-600', 'border-transparent');
+
+            document.getElementById(`view-${tabId}`).classList.remove('hidden');
+            document.getElementById(`tab-${tabId}`).classList.replace('text-slate-500', 'text-indigo-600');
+            document.getElementById(`tab-${tabId}`).classList.replace('border-transparent', 'border-indigo-600');
+
+            if (tabId === 'pokedex') renderPokedex();
+        }
+
+        function showCompletionPopup() {
+            const popup = document.getElementById('completion-popup');
+            const title = document.getElementById('completion-title');
+            const desc = document.getElementById('completion-desc');
+            const btn = document.getElementById('popup-ceremony-btn');
+
+            if (solvedQuizzes.length >= 50) {
+                title.innerText = "👑 [지구촌 대탐험가 마스터]";
+                desc.innerText = "모든 국가 수집 및 퀴즈 마스터 달성!";
+                btn.classList.remove('hidden');
+                if (celebrationReplayCount >= MAX_REPLAYS) {
+                    btn.disabled = true;
+                    btn.innerText = "세레모니 종료 (최대 3회)";
+                    btn.className = "w-full bg-slate-300 text-slate-500 font-black py-3 px-6 rounded-xl shadow-none cursor-not-allowed mb-3";
+                } else {
+                    btn.disabled = false;
+                    btn.innerText = `✨ 세레모니 보기! (남은 횟수: ${MAX_REPLAYS - celebrationReplayCount}회)`;
+                    btn.className = "w-full bg-gradient-to-r from-amber-400 to-yellow-500 hover:from-amber-500 hover:to-yellow-600 text-white font-black py-3 px-6 rounded-xl shadow-lg transition-all mb-3";
+                }
+            } else {
+                title.innerText = "🌱 [초보 탐험가]";
+                desc.innerText = "50개국 수집을 완료하셨습니다!\n\n국가 도감에서 남은 퀴즈를 모두 풀면\n마스터 칭호와 화려한 세레모니가 열립니다!";
+                btn.classList.add('hidden');
+            }
+            popup.classList.remove('hidden');
+        }
+
+        async function playCeremony() {
+            if (celebrationReplayCount >= MAX_REPLAYS) return;
+            
+            closeModal('completion-popup');
+            
+            // 브라우저 정책상 사용자 클릭 직후에 오디오 컨텍스트를 시작해야 확실하게 소리가 납니다.
+            await Tone.start();
+            triggerUltimateFireworks();
+            
+            updateSpinButtonState();
+        }
+
+        function triggerGrandFireworks() {
+            if (celebrationReplayCount >= MAX_REPLAYS) return;
+            celebrationReplayCount++;
+            
+            playFanfare(false);
+            const duration = 3.5 * 1000;
+            const end = Date.now() + duration;
+
+            (function frame() {
+                confetti({ particleCount: 4, angle: 60, spread: 55, origin: { x: 0 }, colors: ['#6366f1', '#a855f7', '#ec4899'] });
+                confetti({ particleCount: 4, angle: 120, spread: 55, origin: { x: 1 }, colors: ['#6366f1', '#a855f7', '#ec4899'] });
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+        }
+
+        function triggerUltimateFireworks() {
+            if (celebrationReplayCount >= MAX_REPLAYS) return;
+            celebrationReplayCount++;
+            
+            playFanfare(true);
+            const duration = 5 * 1000;
+            const end = Date.now() + duration;
+            
+            (function frame() {
+                confetti({ particleCount: 7, angle: 60, spread: 70, origin: { x: 0 }, colors: ['#fbbf24', '#f59e0b', '#ffffff'] });
+                confetti({ particleCount: 7, angle: 120, spread: 70, origin: { x: 1 }, colors: ['#fbbf24', '#f59e0b', '#ffffff'] });
+                
+                if (Math.random() > 0.8) {
+                    confetti({ particleCount: 20, spread: 100, origin: { y: 0.2 }, colors: ['#fcd34d', '#f59e0b'] });
+                }
+                if (Date.now() < end) requestAnimationFrame(frame);
+            }());
+        }
+
+        // Init App
+        window.onload = init;
+
+    </script>
+</body>
+</html>
